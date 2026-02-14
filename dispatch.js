@@ -1,22 +1,45 @@
-// Function to make specific labels bold (e.g., "Start Time:") in a Google Doc body
+/**
+ * This file runs the day-to-day dispatch process.
+ *
+ * In plain terms, this file does all of these jobs:
+ * - reads new form answers for one truck or many trucks
+ * - updates each truck's live dispatch Google Doc
+ * - makes saved archive copies of each dispatch
+ * - rebuilds each company's dispatch web page
+ * - adds a spreadsheet menu button people can click
+ */
+
+/**
+ * Looks through a Google Doc and makes a label bold when it finds that exact text.
+ *
+ * @param {GoogleAppsScript.Document.Body} body - The document text area to search through.
+ * @param {string} labelText - The exact words to find and bold, like "Start Time".
+ */
 function boldLabel(body, labelText) {
-  const paragraphs = body.getParagraphs(); // Get all paragraphs in the document
+  const paragraphs = body.getParagraphs(); // Get every paragraph so we can scan the whole document from top to bottom.
   for (let i = 0; i < paragraphs.length; i++) {
-    const textElement = paragraphs[i].editAsText(); // Convert paragraph to editable text
-    const text = textElement.getText(); // Get the paragraph text
-    const index = text.indexOf(labelText); // Find the label text
+    const textElement = paragraphs[i].editAsText(); // Turn this paragraph into editable text so formatting can be changed.
+    const text = textElement.getText(); // Read the words in this paragraph.
+    const index = text.indexOf(labelText); // Check whether this paragraph contains the label we are looking for.
     if (index !== -1) {
-      // If label found, make that portion bold
+      // If we found that label, make those words bold so they stand out.
       textElement.setBold(index, index + labelText.length - 1, true);
     }
   }
 }
 
-// Triggered automatically when a Google Form is submitted
+/**
+ * This runs automatically each time someone submits the dispatch form.
+ *
+ * If more than one truck was selected, this repeats the same process for each truck:
+ * update live doc, save an archive copy, and refresh the company dispatch page.
+ *
+ * @param {GoogleAppsScript.Events.FormsOnFormSubmit} e - The submitted form answers.
+ */
 function onFormSubmit(e) {
-  const values = e.values; // Get all submitted values from the form
+  const values = e.values; // Get all answers that were submitted in this form response.
 
-  // Extract each value from the form response array using correct indices
+  // These positions match the exact order of fields in the Google Form.
   const date = values[1];
   const rawShiftTime = values[2];
   const company = values[3];
@@ -25,7 +48,7 @@ function onFormSubmit(e) {
   const startLocation = values[6];
   const instructions = values[7];
   const notes = values[8];
-  const truckNumbersRaw = values[9]; // e.g. "RT03, RT12" 
+  const truckNumbersRaw = values[9]; // Example: "RT03, RT12" when multiple trucks are chosen.
   const tolls = values[10];
   const add01 = values[11];
   const add02 = values[12];
@@ -33,29 +56,34 @@ function onFormSubmit(e) {
   const startLocation02 = values[14];
   const instructions02 = values[15];
   
-  // Convert comma-separated string to array
-  const truckNumbers = truckNumbersRaw.split(',').map(truck => truck.trim()); // Multiple truck numbers 
+  // Split the truck list by commas so we can handle one truck at a time.
+  const truckNumbers = truckNumbersRaw.split(',').map(truck => truck.trim()); // This becomes a clean list of truck numbers.
 
-  Logger.log(values);  // Add this line right after: const values = e.values;
+  Logger.log(values);  // Log full form values so staff can troubleshoot bad input later.
 
-  // Logging for debugging (viewable in script editor's logs)
+  // Log raw times so we can see exactly what the form sent before formatting.
   console.log("Raw Shift Time:", rawShiftTime);
   console.log("Raw Start Time:", rawStartTime);
   console.log("Raw Start Time 02:", startTime02Raw);
 
-truckNumbers.forEach(truckNumber => { // Loop for each truck number 
+truckNumbers.forEach(truckNumber => { // Run the full update for each selected truck, one by one.
 
-  // At the top of onFormSubmit
+  // Build a date like 2025-06-01 so file names sort correctly by day.
   const formattedDate = Utilities.formatDate(new Date(date), Session.getScriptTimeZone(), "yyyy-MM-dd");
 
-  // Format times to be more readable
+  // Convert raw time text into readable time values for drivers and office staff.
   const shiftTime = formatTime(rawShiftTime);
   const startTime = formatTime(rawStartTime);
   const startTime02 = formatTime(startTime02Raw);
 
-  const sortableStartTime = convertToSortableTime(rawStartTime); // Defining sortableStartTime - NEW
+  // Make a 24-hour HHMM value (like 0615) so archived files sort by start time.
+  const sortableStartTime = convertToSortableTime(rawStartTime);
 
-  function convertToSortableTime(rawTime) { // Helper Function - NEW
+  /**
+   * Turns a time into HHMM (for example 6:15 AM -> 0615) for file name sorting.
+   * If time cannot be read, use 0000 so the file can still be named safely.
+   */
+  function convertToSortableTime(rawTime) {
     if (!rawTime) return "0000";
     const match = rawTime.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
     if (!match) return "0000";
@@ -67,16 +95,16 @@ truckNumbers.forEach(truckNumber => { // Loop for each truck number
     if (period === "PM" && hour < 12) hour += 12;
     if (period === "AM" && hour === 12) hour = 0;
 
-    return `${hour.toString().padStart(2, '0')}${minutes}`; // End Helper Function - NEW
+    return `${hour.toString().padStart(2, '0')}${minutes}`; // End of helper that builds sortable HHMM time.
   }
 
-  // ID of the Google Docs template used for archive copies
+  // Google Doc template used to create each archived dispatch copy.
   const templateId = "1Gx6VGwAt202ffjtdHUJSF1ZCGlfS5ZluLFor_bp1Ggs";
 
-  // Fallback archive folder ID if truck number doesn’t match
+  // Fallback archive folder if this truck does not have its own folder mapped.
   const archiveFolderId = "1_idlRE8_vOcQSEX97k9iS1huoWf-ZbRb";
 
-  // Map truck numbers to their specific live Google Doc IDs
+  // Map each truck number to its live dispatch Google Doc.
   const truckDocIds = {
     "DT02": "1MiMefcafZbpwXz7K9uNlUXESZOx2GMT42Hev02gpKdM",
     "RT03": "1M4eJww7DaLG25CVKlt0uaRulLOFsWflH3e9z6FA9O5Q",
@@ -115,7 +143,7 @@ truckNumbers.forEach(truckNumber => { // Loop for each truck number
     "JJM01": "1wnpQcPVrHxKq7Db1R57fxfXoQ5UEHdf7CrHt0Qc0Zcw"
   };
 
-  // Map truck numbers to their specific archive folders
+  // Map each truck number to the Drive folder where its archive copies are saved.
   const truckArchiveFolders = {
     "DT02": "13py6BfAZPxkPD9K0KPdXkXufBccxPalC",
     "RT03": "1qNay0z8In_iALbomZib2EpzD4JC8uBiF",
@@ -154,13 +182,13 @@ truckNumbers.forEach(truckNumber => { // Loop for each truck number
     "JJM01": "1l4dujP4Kig5VtK4w-ssokzrv6rhmf22a"
     };  
 
-  // NO-OP: removed unnecessary DocumentApp.create to avoid creating a blank doc in My Drive.
-  // We update existing live truck docs by ID and create archive copies from the template below.
-  // Create new doc from template
+  // We do not create a brand-new blank doc here.
+  // Instead, we update the truck's existing live doc and then create an archive copy from template.
+  // Old approach kept here for reference: create a new doc directly.
   // const doc = DocumentApp.create(`${formattedDate}_${sortableStartTime}_Dispatch_${truckNumber}_${jobNumber}`);
   // const body = doc.getBody();
 
-  // Template block with placeholders to be replaced
+  // Base dispatch message. Placeholder words like {{DATE}} are replaced with real values.
   let placeholdersBlock = `✅ CONFIRM DISPATCH ✅
 
 {{DATE}}
@@ -201,7 +229,7 @@ Job No. {{JOB NUMBER}}
 6️⃣ Do not leave job early!
 7️⃣ Drivers must report all problems to ALEX immediately! → (732) 470-8667`;
 
-  // Replace check-in/out section with custom MCRC message if job is MCRC
+  // If job number is MCRC, swap in MCRC rules text for drivers.
   if (jobNumber.toUpperCase() === 'MCRC') {
     placeholdersBlock = placeholdersBlock.replace(
       /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
@@ -215,7 +243,7 @@ Job No. {{JOB NUMBER}}
     );
   }
 
-  // Replace check-in/out section with custom CMPM message if job is CMPM
+  // If job number is CMPM, swap in CMPM rules text for drivers.
   if (jobNumber.toUpperCase() === 'CMPM') {
     placeholdersBlock = placeholdersBlock.replace(
       /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
@@ -227,19 +255,19 @@ Job No. {{JOB NUMBER}}
     );
   }
 
-  // Get the Google Doc ID for the truck's live doc
+  // Find the live Google Doc for this truck and stop if the truck number is unknown.
   const docId = truckDocIds[truckNumber];
   if (!docId) {
     console.log(`Unknown truck number: ${truckNumber}`);
     return;
   }
 
-  // === UPDATE THE LIVE TRUCK DOC ===
+  // ===== STEP 1: Update the truck's live dispatch document =====
   const truckDoc = DocumentApp.openById(docId);
   const truckBody = truckDoc.getBody();
-  truckBody.setText(placeholdersBlock); // Set template block text
+  truckBody.setText(placeholdersBlock); // Put the full template text into the live doc before filling placeholders.
   
-  // Bold + underline specific MCRC lines if present
+  // If this is an MCRC job, make the key warning lines bold and underlined.
   if (jobNumber.toUpperCase() === 'MCRC') {
     const bodyText = truckBody.editAsText();
     const phrasesToStyle = ["5 LOADS MINIMUM", "NO TICKETS - NO PAYMENT"];
@@ -252,7 +280,7 @@ Job No. {{JOB NUMBER}}
     });
   }
 
-  // Bold + underline specific MCRC lines if present
+  // If this is a CMPM job, make the key warning lines bold and underlined.
   if (jobNumber.toUpperCase() === 'CMPM') {
     const bodyText = truckBody.editAsText();
     const phrasesToStyle = ["2 ROUNDS MINIMUM", "NO TICKETS - NO PAYMENT"];
@@ -265,7 +293,7 @@ Job No. {{JOB NUMBER}}
     });
   }
 
-  // Replace placeholders with actual values from form
+  // Fill all required placeholders (date, company, job number, times, etc.).
   truckBody.replaceText("{{DATE}}", date);
   truckBody.replaceText("{{SHIFT TIME}}", shiftTime + " ");
   truckBody.replaceText("{{COMPANY}}", company);
@@ -277,7 +305,7 @@ Job No. {{JOB NUMBER}}
   truckBody.replaceText("{{TRUCK NUMBER}}", truckNumber);
   truckBody.replaceText("{{TOLLS}}", tolls);
 
-  // Handle optional field ADD 01
+  // For ADD 01: if user typed text, insert it; if blank, remove that line.
   if (add01.trim()) {
     truckBody.replaceText("{{ADD 01}}", add01.trim());
   } else {
@@ -285,12 +313,12 @@ Job No. {{JOB NUMBER}}
     if (paragraph) paragraph.removeFromParent();
   }
 
-  // Handle optional field ADD 02
+  // For ADD 02: if user typed text, insert it and add spacing; if blank, remove that line.
   if (add02.trim()) {
     const para = findParagraphContaining(truckBody, "{{ADD 02}}");
     if (para) {
       const index = truckBody.getChildIndex(para);
-      truckBody.insertParagraph(index, ""); // Insert blank line above assignment 2 if it exists
+      truckBody.insertParagraph(index, ""); // Add an empty line above ADD 02 so the document stays easy to read.
     }
     truckBody.replaceText("{{ADD 02}}", add02.trim());
   } else {
@@ -298,7 +326,7 @@ Job No. {{JOB NUMBER}}
     if (paragraph) paragraph.removeFromParent();
   }
 
-  // Format and bold assignment 2 fields if present, otherwise remove
+  // For second assignment fields: show and format them only when the form includes values.
   if (startTime02Raw.trim()) {
     const label = "▪️Start Time 02:";
     const formatted = `${label} ${startTime02}`;
@@ -329,7 +357,7 @@ Job No. {{JOB NUMBER}}
     if (paragraph) paragraph.removeFromParent();
   }
 
-  // Bold core labels in the dispatch
+  // Bold key labels again after text replacement (CONFIRM DISPATCH, Start Time, etc.).
   boldLabel(truckBody, "CONFIRM DISPATCH");
   boldLabel(truckBody, "Start Time");
   boldLabel(truckBody, "Start Location");
@@ -340,25 +368,25 @@ Job No. {{JOB NUMBER}}
 
   truckDoc.saveAndClose();
 
-  // === CREATE ARCHIVE COPY ===
+  // ===== STEP 2: Create and fill an archive copy =====
   try {
-    const template = DriveApp.getFileById(templateId); // Get base template file
-    const folderId = truckArchiveFolders[truckNumber] || archiveFolderId; // Use truck-specific folder or fallback to default
-    const archiveFolder = DriveApp.getFolderById(folderId); // Get the target folder
+    const template = DriveApp.getFileById(templateId); // Load the template file from Drive.
+    const folderId = truckArchiveFolders[truckNumber] || archiveFolderId; // Save to this truck's folder when mapped, otherwise use the fallback folder.
+    const archiveFolder = DriveApp.getFolderById(folderId); // Open the destination Drive folder.
 
-    // Create a file name using sortable date and time for easy chronological sorting
+    // Build date text used in archive file naming so files stay in date order.
     const sortableDate = Utilities.formatDate(new Date(date), Session.getScriptTimeZone(), "yyyy-MM-dd");
 
-    // Use the sortableStartTime already calculated from rawStartTime
-    const newName = `${formattedDate}_${sortableStartTime}_Dispatch_${truckNumber}_${jobNumber}`; // Archive Name Format - NEW
+    // Use the same HHMM start time in the archive file name.
+    const newName = `${formattedDate}_${sortableStartTime}_Dispatch_${truckNumber}_${jobNumber}`; // File name pattern: YYYY-MM-DD_HHMM_Dispatch_TRUCK_JOB.
 
-    // Make a copy of the template into the archive folder and open the new document
+    // Create a new archive doc from the template, then open it to fill in details.
     const archiveCopy = template.makeCopy(newName, archiveFolder);
-    archiveCopy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); // Access for anyone with link
+    archiveCopy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); // Allow anyone with the link to view this archive copy.
     const archiveDoc = DocumentApp.openById(archiveCopy.getId());
     const archiveBody = archiveDoc.getBody();
 
-    // Replace check-in/out section with custom MCRC message in archive if applicable
+    // In archive copy: if job is MCRC, replace the normal check-in section with MCRC rules.
     if (jobNumber.toUpperCase() === 'MCRC') {
       const archiveText = archiveBody.getText();
       const updatedText = archiveText.replace(
@@ -374,7 +402,7 @@ Job No. {{JOB NUMBER}}
       archiveBody.setText(updatedText); 
     }
 
-    // Replace check-in/out section with custom CMPM message in archive if applicable
+    // In archive copy: if job is CMPM, replace the normal check-in section with CMPM rules.
     if (jobNumber.toUpperCase() === 'CMPM') {
       const archiveText = archiveBody.getText();
       const updatedText = archiveText.replace(
@@ -388,7 +416,7 @@ Job No. {{JOB NUMBER}}
       archiveBody.setText(updatedText); 
     }
 
-    // Now apply bold + underline styles
+    // After text replacement, bold and underline important warning phrases.
     const textObj = archiveBody.editAsText();
     const phrasesToStyle = ["5 LOADS MINIMUM", "2 ROUNDS MINIMUM", "NO TICKETS - NO PAYMENT"];
     phrasesToStyle.forEach(phrase => {
@@ -399,7 +427,7 @@ Job No. {{JOB NUMBER}}
       }
     });
   
-    // Replace basic placeholders
+    // Fill all required placeholders in the archive copy.
     archiveBody.replaceText("{{DATE}}", date);
     archiveBody.replaceText("{{SHIFT TIME}}", shiftTime + " ");
     archiveBody.replaceText("{{COMPANY}}", company);
@@ -411,20 +439,20 @@ Job No. {{JOB NUMBER}}
     archiveBody.replaceText("{{TRUCK NUMBER}}", truckNumber);
     archiveBody.replaceText("{{TOLLS}}", tolls);
 
-    // Handle optional ADD 01
+    // Archive ADD 01: add text if present, otherwise remove the placeholder line.
     if (add01.trim()) {
       archiveBody.replaceText("{{ADD 01}}", add01.trim());
     } else {
       const paragraph = findParagraphContaining(archiveBody, "{{ADD 01}}");
-      if (paragraph) paragraph.removeFromParent(); // Remove line if empty
+      if (paragraph) paragraph.removeFromParent(); // Remove this line completely when field is empty.
     }
 
-    // Handle optional ADD 02 (with blank line above if present)
+    // Archive ADD 02: add text plus spacing if present, otherwise remove the line.
     if (add02.trim()) {
       const para = findParagraphContaining(archiveBody, "{{ADD 02}}");
       if (para) {
         const index = archiveBody.getChildIndex(para);
-        archiveBody.insertParagraph(index, ""); // Insert blank line above
+        archiveBody.insertParagraph(index, ""); // Add an empty line above this section for readability.
       }
       archiveBody.replaceText("{{ADD 02}}", add02.trim());
     } else {
@@ -432,7 +460,7 @@ Job No. {{JOB NUMBER}}
       if (paragraph) paragraph.removeFromParent();
     }
 
-    // Handle START TIME 02 (bold label if present)
+    // Archive second assignment start time: include only when provided.
     if (startTime02Raw.trim()) {
       const label = "Start Time 02:";
       const formatted = `${label} ${startTime02}`;
@@ -443,7 +471,7 @@ Job No. {{JOB NUMBER}}
       if (paragraph) paragraph.removeFromParent();
     }
 
-    // Handle START LOCATION 02 (bold label if present)
+    // Archive second assignment location: include only when provided.
     if (startLocation02.trim()) {
       const label = "Start Location 02:";
       const formatted = `${label}\n${startLocation02}`;
@@ -454,7 +482,7 @@ Job No. {{JOB NUMBER}}
       if (paragraph) paragraph.removeFromParent();
     }
 
-    // Handle INSTRUCTIONS 02 (bold label if present)
+    // Archive second assignment instructions: include only when provided.
     if (instructions02.trim()) {
       const label = "Instructions 02:";
       const formatted = `${label}\n${instructions02}`;
@@ -465,7 +493,7 @@ Job No. {{JOB NUMBER}}
       if (paragraph) paragraph.removeFromParent();
     }
 
-    // Apply bold formatting to standard labels
+    // Bold key labels in the archive copy so the layout matches the live version.
     boldLabel(archiveBody, "CONFIRM DISPATCH");
     boldLabel(archiveBody, "Start Time");
     boldLabel(archiveBody, "Start Location");
@@ -474,34 +502,39 @@ Job No. {{JOB NUMBER}}
     boldLabel(archiveBody, "Start Location 02:");
     boldLabel(archiveBody, "Instructions 02:");
 
-    archiveDoc.saveAndClose(); // Finalize and save the document
+    archiveDoc.saveAndClose(); // Save all archive changes to Drive.
     console.log(`Archive copy created successfully: ${newName}`);
   } catch (error) {
-    console.error("Error creating archive copy:", error); // Log any issues
+    console.error("Error creating archive copy:", error); // If archive creation fails, write the error to logs for troubleshooting.
   }
 
-  // Format times to remove seconds
+  /**
+   * Read a raw time value and return a clean time like 6:15 AM in this script's time zone.
+   *
+   * @param {string} rawTime - Original time text from the form.
+   * @returns {string} A cleaned-up time string, or the original text if it cannot be parsed.
+   */
   function formatTime(rawTime) {
     Logger.log("Raw value received in formatTime: " + rawTime);
     if (!rawTime) return "";
 
-    // Try to parse rawTime string like "5:00:00 AM"
+    // Try to read times that look like 5:00:00 AM or 17:00.
     const timePattern = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i;
     const match = rawTime.match(timePattern);
-    if (!match) return rawTime;  // Return raw if format unrecognized
+    if (!match) return rawTime;  // If the format is unknown, keep the original value.
 
     let [, hourStr, minuteStr, ampm] = match;
     let hour = parseInt(hourStr, 10);
     const minute = parseInt(minuteStr, 10);
 
-    // Convert to 24-hour format if AM/PM exists
+    // Convert AM/PM time into 24-hour values before final formatting.
     if (ampm) {
       const isPM = ampm.toUpperCase() === "PM";
       if (isPM && hour !== 12) hour += 12;
       if (!isPM && hour === 12) hour = 0;
     }
 
-    // Create a date with today's date, but custom hour and minute
+    // Build a temporary Date using today's date plus this hour and minute.
     const date = new Date();
     date.setHours(hour);
     date.setMinutes(minute);
@@ -511,10 +544,11 @@ Job No. {{JOB NUMBER}}
     return Utilities.formatDate(date, Session.getScriptTimeZone(), "h:mm a");
   }
 
-  // Searches through all paragraphs in a Google Doc body to find the first paragraph
-  // that contains a specific text string (e.g., a placeholder like {{ADD 01}}).
-  // Useful for removing or inserting text conditionally during template replacement.
-  // Returns the Paragraph object if found, or null if not found.
+  /**
+   * Scan each paragraph and return the first one that contains the target words.
+   *
+   * This is used when we need to remove placeholder lines that were left blank.
+   */
   function findParagraphContaining(body, searchText) {
     const paragraphs = body.getParagraphs();
     for (let i = 0; i < paragraphs.length; i++) {
@@ -525,11 +559,16 @@ Job No. {{JOB NUMBER}}
     return null;
   }
 
-  // Retrieves and returns a sorted list of dispatch files for a given truck.
-  // Dispatch files must follow this naming format:
-  // "YYYY-MM-DD_HHMM_Dispatch_TRUCKNUMBER_JOBNUMBER"
-  // Returns an array of objects: [{ date, time24hr, jobNumber, url }, ...]
-  // Results are sorted chronologically for later display or filtering.
+  /**
+   * Read one truck's archive files and build a sorted list of dispatch details.
+   *
+   * Expected file name shape:
+   * YYYY-MM-DD_HHMM_Dispatch_TRUCKNUMBER_JOBNUMBER
+   *
+   * @param {string} truckNumber - Truck number used to find the right archive folder.
+   * @returns {Array<{date:string,time24hr:string,jobNumber:string,url:string}>}
+   *   Dispatch info sorted from oldest to newest.
+   */
   function getTruckDispatches(truckNumber) {
     const truckFolders = {
       "DT02": "13py6BfAZPxkPD9K0KPdXkXufBccxPalC",
@@ -578,7 +617,7 @@ Job No. {{JOB NUMBER}}
 
     while (files.hasNext()) {
       const file = files.next();
-      const name = file.getName(); // e.g. "2025-05-13_0615_Dispatch_RT03_00123"
+      const name = file.getName(); // Example file name: 2025-05-13_0615_Dispatch_RT03_00123
       const url = file.getUrl();
 
       const match = name.match(/^(\d{4}-\d{2}-\d{2})_(\d{4})_Dispatch_[^_]+_(\d+)/);
@@ -592,7 +631,7 @@ Job No. {{JOB NUMBER}}
       }
     }
 
-    // Sort by date and time
+    // Sort by date and time so results are in order.
     dispatches.sort((a, b) => {
       const aKey = `${a.date}_${a.time24hr}`;
       const bKey = `${b.date}_${b.time24hr}`;
@@ -602,7 +641,7 @@ Job No. {{JOB NUMBER}}
     return dispatches;
   }
 
-  // Update each Truck to Company Folder
+  // Map truck number to company name so we refresh the correct company page only.
   const truckToCompanyMap = {
   'DT02': 'Capital Contracting Group',
   'RT03': 'RT Masonry',
@@ -639,7 +678,7 @@ Job No. {{JOB NUMBER}}
   'ELS05': 'Element Logistics',
   'WMBA11': 'WMBA Trucking',
   'JJM01': 'JJM Dump'
-  // Add more as needed
+  // Add new truck-to-company pairs here when new trucks are added.
 };
 
 const companyName = truckToCompanyMap[truckNumber];
@@ -649,10 +688,14 @@ if (companyName) {
   Logger.log(`Company not found for truck number: ${truckNumber}`);
 }
 
-}); // End Loop for multiple trucks 
-} // End onFormSubmit =============================================================================== End of onFormSubmit function
+}); // Finished processing all selected trucks.
+} // End of the form submit workflow.
 
-// Begin updateCompanyDispatchPage function on website
+/**
+ * Create or update one company web page that lists dispatches by Upcoming, Today, and Past.
+ *
+ * @param {string} companyName - The company name used to find folders and title the page.
+ */
 function updateCompanyDispatchPage(companyName) {
   const folderMap = {
     "Capital Contracting Group": ["DT02"],
@@ -679,18 +722,18 @@ function updateCompanyDispatchPage(companyName) {
 
   let allFiles = [];
 
-  // Aggregate dispatch files from all truck folders within the company folder
+  // Collect dispatch files from every truck folder that belongs to this company.
   for (const truckNum of truckFolders) {
     const truckFolder = companyFolder.getFoldersByName(truckNum).next();
     const files = truckFolder.getFiles();
     while (files.hasNext()) {
       const file = files.next();
-      if (file.getName().endsWith(".html")) continue; // skip HTML pages
+      if (file.getName().endsWith(".html")) continue; // Skip HTML files because they are web pages, not dispatch docs.
       allFiles.push(file);
     }
   }
 
-  // === Only show dispatches newer than 18 days, but don’t delete them ===
+  // Only show dispatches from the last 18 days on the web page. Older files are kept, not deleted.
   const EIGHTEEN_DAYS_MS = 18 * 24 * 60 * 60 * 1000;
   const now = new Date().getTime();
 
@@ -701,27 +744,27 @@ function updateCompanyDispatchPage(companyName) {
       recentFiles.push(file);
     }
   }
-  allFiles = recentFiles; // use this filtered list for page generation
+  allFiles = recentFiles; // Use only recent files for the page output.
 
 
-  // === Clean up files after 18 days ===
- // const EIGHTEEN_DAYS_MS = 18 * 24 * 60 * 60 * 1000;
-  //const now = new Date().getTime();
+  // Old cleanup idea below is commented out and does not run.
+ // Example old setting: 18 days in milliseconds.
+  // Example old value: current time in milliseconds.
 
-  //for (const file of allFiles) {
-    //const createdTime = file.getDateCreated().getTime();
-    //if ((now - createdTime) > EIGHTEEN_DAYS_MS) {
-      //try {
-        //file.setTrashed(true); // Move to trash instead of deleting outright
-        //Logger.log(`🗑️ Trashed old dispatch: ${file.getName()}`);
-      //} catch (err) {
-        //Logger.log(`❌ Error trashing file: ${file.getName()} - ${err}`);
+  // Example old loop through files.
+    // Example old file creation timestamp.
+    // Example old condition: file older than 18 days.
+      // Example old try block.
+        // Example old action: move old file to trash.
+        // Example old log message after trashing.
+      // Example old catch block.
+        // Example old error log.
       //}
     //}
   //}
 
 
-  // Parse metadata and sort
+  // Read date/time from each dispatch file name so we can place each item in the right section.
   const dispatches = allFiles.map(file => {
     const name = file.getName();
     const dateMatch = name.match(/(\d{4}-\d{2}-\d{2})_(\d{4})/);
@@ -729,6 +772,7 @@ function updateCompanyDispatchPage(companyName) {
     return { file, name, date };
   }).sort((a, b) => a.date - b.date);
 
+    // Helper: remove time-of-day so comparisons are based on calendar day only.
     function stripTime(date) {
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     }
@@ -786,7 +830,7 @@ function updateCompanyDispatchPage(companyName) {
   const pastHTML = past.map(e => e.html).join('\n');
 
 
-  //Webpage layout
+  // Build the final HTML page that users open to see dispatch links.
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -799,7 +843,7 @@ function updateCompanyDispatchPage(companyName) {
       text-align: center;
       padding: 10px 20px;
       display: inline-block;
-      background-color: #FFD700; /* construction yellow */
+      background-color: #FFD700; /* Bright yellow background so the title looks like a construction header. */
       border-radius: 25px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
@@ -829,9 +873,9 @@ function updateCompanyDispatchPage(companyName) {
       text-decoration: underline;
     }
     .dispatch-block a {
-      color: #1a73e8; /* Google Blue */
+      color: #1a73e8; /* Blue link color so dispatch links are easy to spot. */
       text-decoration: underline;
-      font-weight: bold; /*Make links bold */
+      font-weight: bold; /* Make dispatch links bold so they stand out. */
     }
     .title-container {
       text-align: center;
@@ -839,9 +883,9 @@ function updateCompanyDispatchPage(companyName) {
     }
     .dispatch-title {
       display: inline-block;
-      background-color: #FFD700; /* Construction yellow */
+      background-color: #FFD700; /* Keep the title bubble in construction-style yellow. */
       padding: 12px 24px;
-      border-radius: 999px; /* Pill/bubble shape */
+      border-radius: 999px; /* Rounded shape to make the title look like a pill bubble. */
       font-size: 2em;
       font-weight: bold;
       color: #000;
@@ -886,7 +930,9 @@ function updateCompanyDispatchPage(companyName) {
 }
 
 
-// Adds update button to google sheets for updating all pages manually
+/**
+ * When the spreadsheet opens, add a custom menu called Dispatch Tools.
+ */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🚚 Dispatch Tools')
@@ -894,7 +940,9 @@ function onOpen() {
     .addToUi();
 }
 
- // updates all pages based on trigger -- every 1 hour
+/**
+ * Rebuild dispatch pages for every company (can be run by hourly trigger).
+ */
 function updateAllCompanyPages() {
   const companies = [
     "Capital Contracting Group",

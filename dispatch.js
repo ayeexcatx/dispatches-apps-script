@@ -98,7 +98,9 @@ truckNumbers.forEach(truckNumber => { // Run the full archive flow for each sele
   }
 
   // Google Doc template used to create each archived dispatch copy.
-  const templateId = "1Gx6VGwAt202ffjtdHUJSF1ZCGlfS5ZluLFor_bp1Ggs";
+  const templateId = (jobNumber.toUpperCase() === 'MCRC' || jobNumber.toUpperCase() === 'CMPM')
+    ? "1pjh-x8I2Zfc4d-CTAbvPDcRWobp6Z0H6SbR7PT2dNc4"
+    : "1Gx6VGwAt202ffjtdHUJSF1ZCGlfS5ZluLFor_bp1Ggs";
 
   // Fallback archive folder if this truck does not have its own folder mapped.
   const archiveFolderId = "1_idlRE8_vOcQSEX97k9iS1huoWf-ZbRb";
@@ -161,47 +163,6 @@ truckNumbers.forEach(truckNumber => { // Run the full archive flow for each sele
     const archiveDoc = DocumentApp.openById(archiveCopy.getId());
     const archiveBody = archiveDoc.getBody();
 
-    // In archive copy: if job is MCRC, replace the normal check-in section with MCRC rules.
-    if (jobNumber.toUpperCase() === 'MCRC') {
-      const archiveText = archiveBody.getText();
-      const updatedText = archiveText.replace(
-         /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
-         `*5 LOADS MINIMUM*⚠️ 
-
-🛑Monmouth County Reclamation Center gate closes at 03:30 PM!
- 
-⚠️Save all Pure Soil & Monmouth County Reclamation Center tickets and give to CCG. Tickets are required for payment!
-
-*NO TICKETS - NO PAYMENT*\n\n`
-      );
-      archiveBody.setText(updatedText); 
-    }
-
-    // In archive copy: if job is CMPM, replace the normal check-in section with CMPM rules.
-    if (jobNumber.toUpperCase() === 'CMPM') {
-      const archiveText = archiveBody.getText();
-      const updatedText = archiveText.replace(
-         /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
-         `*2 ROUNDS MINIMUM*⚠️ 
- 
-⚠️Save all Pure Soil, Colony Materials, & Plumstead Materials tickets and give to CCG. Tickets are required for payment!
-
-*NO TICKETS - NO PAYMENT*\n\n`
-      );
-      archiveBody.setText(updatedText); 
-    }
-
-    // After text replacement, bold and underline important warning phrases.
-    const textObj = archiveBody.editAsText();
-    const phrasesToStyle = ["5 LOADS MINIMUM", "2 ROUNDS MINIMUM", "NO TICKETS - NO PAYMENT"];
-    phrasesToStyle.forEach(phrase => {
-      const idx = textObj.getText().indexOf(phrase);
-      if (idx !== -1) {
-        textObj.setBold(idx, idx + phrase.length, true);
-        textObj.setUnderline(idx, idx + phrase.length, true);
-      }
-    });
-  
     // Fill all required placeholders in the archive copy.
     archiveBody.replaceText("{{DATE}}", date);
     archiveBody.replaceText("{{SHIFT TIME}}", shiftTime + " ");

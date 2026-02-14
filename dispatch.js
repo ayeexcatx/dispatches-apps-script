@@ -3,7 +3,6 @@
  *
  * In plain terms, this file does all of these jobs:
  * - reads new form answers for one truck or many trucks
- * - updates each truck's live dispatch Google Doc
  * - makes saved archive copies of each dispatch
  * - rebuilds each company's dispatch web page
  * - adds a spreadsheet menu button people can click
@@ -32,7 +31,7 @@ function boldLabel(body, labelText) {
  * This runs automatically each time someone submits the dispatch form.
  *
  * If more than one truck was selected, this repeats the same process for each truck:
- * update live doc, save an archive copy, and refresh the company dispatch page.
+ * save an archive copy and refresh the company dispatch page.
  *
  * @param {GoogleAppsScript.Events.FormsOnFormSubmit} e - The submitted form answers.
  */
@@ -66,7 +65,7 @@ function onFormSubmit(e) {
   console.log("Raw Start Time:", rawStartTime);
   console.log("Raw Start Time 02:", startTime02Raw);
 
-truckNumbers.forEach(truckNumber => { // Run the full update for each selected truck, one by one.
+truckNumbers.forEach(truckNumber => { // Run the full archive flow for each selected truck, one by one.
 
   // Build a date like 2025-06-01 so file names sort correctly by day.
   const formattedDate = Utilities.formatDate(new Date(date), Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -103,45 +102,6 @@ truckNumbers.forEach(truckNumber => { // Run the full update for each selected t
 
   // Fallback archive folder if this truck does not have its own folder mapped.
   const archiveFolderId = "1_idlRE8_vOcQSEX97k9iS1huoWf-ZbRb";
-
-  // Map each truck number to its live dispatch Google Doc.
-  const truckDocIds = {
-    "DT02": "1MiMefcafZbpwXz7K9uNlUXESZOx2GMT42Hev02gpKdM",
-    "RT03": "1M4eJww7DaLG25CVKlt0uaRulLOFsWflH3e9z6FA9O5Q",
-    "RT12": "1MhmPdyDzTu1NcXznoKRfgi1yMPHXMeryZGEww7QSH5k",
-    "RT33": "1v1JM90NrT9oH7h55wfxigZjdys4yk0RcNc-0qlTGb78",
-    "EXCL1": "1swlDuc93YWMZ4llSDNc2rMJi9-I4PhwRST_C7Fq3i2c",
-    "WAJA01": "15bx7Ash8LlyuVQhNOdnbjifi6lC9OXVzYe7s_RsxYl8",
-    "WAJA03": "1jLIpVCwaCumqimROSh4yhEjAp_3C7beC-vfU7QmHVPc",
-    "IDR25": "1DwOvot33hjEZIMMTpU-MEq496oOgSEiGSx8wD08ltyg",
-    "MANA1": "1oxWaEUwHCubVuFN-ET0mCuUTg9tDfceZknRfCb8tfuk",
-    "MANA4": "1wPQACFX5w74ifwflf8AiSNUTsBZ6oAnMn1HncXeint0",
-    "CHINOS1": "1od43UH5ATks90xNvJpEPiiqwWELBsQUf4Mrr7YVyM3s",
-    "CHINOS5": "1TWgttIBvru6WGhzU-FgkxAEIy9YGfMesrygqA6lgn1M",
-    "CHINITOS1": "1lZ-aRPEOUM5vpgxqDr7Iz42yT6jDk6C_2Df82qOd9nE",
-    "CHINITOS5": "1jSAzQwIPo1TVKSJfAw44aUMdhQHJJIhoy32tddXXW3Y",
-    "CHINITOS6": "1oysz6yP9ftBzz09843a3YU89pb7DO0uti7dY88zQhMo",
-    "CONIG22": "1LdhX8cz-MVXp-ujFIUZ4wEKjoMoBq8rU16ujaAc3U4o",
-    "CONIG29": "1kzKx6EkMjLPmxMGgzxLoyk88j9X6Sn-OdbrVL39x71Q",
-    "CRAVO27": "10IbtW-6rhnbHldQFKnjI-GK3w57BrpOWLvkbUiCcgmo",
-    "ECE03": "1HQgNe_XG7uLjaptVQB-VCM92D7Q4BaU6NM-bSmOjsQU",
-    "RMT05": "17LVPMKZHgCc0MwQJpRrQFZBKaqb3_f88Tpk4A23BPC8",
-    "RMT07": "1bkYeWuuRomaU7BiQMJ7zE9lfsTgSZMNLlAOnTs-Ngj4",
-    "RMT77": "1L9xBt54pGobuCV-p7rsh943eR4ONxt3QI3UOyAXqNlw",
-    "GEMA1": "1bFJMlS-6gOG0_-E8pf-ALPWHLVKN_f2SC693ppriVgU",
-    "GEMA4": "18rzJfZYpQ0wg9OmtLnWT3GfgSC7siVhm-rwHfAOMz9M",
-    "WAC01": "1gsTgt0cIpyFy-owPe4sGV9sQx4a8ZSSwRmUNwYFnH7s",
-    "WAC02": "1g7XaB74sNAIF6s8YUkMuf4KtsXpKZ23aNys5HTQ4nN4",
-    "WAC03": "1GKqObdhwbiqmHLkSdlrKbWo9o2VaiOKnbJig_N3QJ5Q",
-    "SFB98": "13x0ZKR3u5hkEsRuayc5PP63PgASiDlgW0oVZyIpNaEY",
-    "DARBY96": "1txAxpx7B2hKMWgvvjr-IwkofJzJFVT4HtlwhS-uZaJ8",
-    "DARBY95": "1nkGAJ93MghUxQzR_nRb_zs6tlL7snqB74Oq0UA9R6PQ",
-    "SFB97": "1wZgbB52doHeKvrsuThS5Yk_d5zO9gCYAnS0FLwSj-aQ",
-    "RKO16": "1H1ql3y75ED_ncGCMOaaNuEATqBxMgWPxnimT2335x48",
-    "ELS05": "1g5OASsDLyHJRCjQeeBQVOEG--DZLlxgcuI-xWsVVohQ",
-    "WMBA11": "12tlrX9qDoNHedx7fzvgevJbz19baPzUPjK7JMPebosU",
-    "JJM01": "1wnpQcPVrHxKq7Db1R57fxfXoQ5UEHdf7CrHt0Qc0Zcw"
-  };
 
   // Map each truck number to the Drive folder where its archive copies are saved.
   const truckArchiveFolders = {
@@ -183,199 +143,14 @@ truckNumbers.forEach(truckNumber => { // Run the full update for each selected t
     };  
 
   // We do not create a brand-new blank doc here.
-  // Instead, we update the truck's existing live doc and then create an archive copy from template.
-  // Old approach kept here for reference: create a new doc directly.
-  // const doc = DocumentApp.create(`${formattedDate}_${sortableStartTime}_Dispatch_${truckNumber}_${jobNumber}`);
-  // const body = doc.getBody();
+  // Dispatches are archived by creating a copy from the template doc.
 
-  // Base dispatch message. Placeholder words like {{DATE}} are replaced with real values.
-  let placeholdersBlock = `✅ CONFIRM DISPATCH ✅
-
-{{DATE}}
-{{SHIFT TIME}}
-{{COMPANY}}
-Job No. {{JOB NUMBER}}
-
-{{ADD 01}}
-▪️Start Time: {{START TIME}}
-▪️Start Location:
-{{START LOCATION}}
-▪️Instructions:
-{{INSTRUCTIONS}}
-{{ADD 02}}
-{{START TIME 02:}}
-{{START LOCATION 02:}}
-{{INSTRUCTIONS 02:}}
-{{NOTES}}
-
-➡️ Working for Capital Contracting Group
-
-#️⃣ {{TRUCK NUMBER}} #️⃣
-
-🎧CB Radios must be ON and working at ALL times🎧
-
-🚫NO STOPS while truck is loaded with asphalt🚫
-
-⚠️ Check in/out with either (A)Trucking Foreman (B)Plant/Scale House (C)Earle Personnel (D)GPS Tracker(if assigned), or (E)FleetWatcher APP.
-
-⚠️ Dump body must be clean or else truck will be sent home.
-
-🚨 NOTES 🚨 
-1️⃣ Tolls authorized: {{TOLLS}}
-2️⃣ Remove towing hitch from the dump truck.
-3️⃣ Please ensure you have safety vest/hard hat. Please follow construction safety rules, no speeding on job site.
-4️⃣ It is the responsibility of the hauler to communicate, verify and confirm check in/out times with Earle personnel.
-5️⃣ Breakdowns, call outs and late arrivals must be reported immediately.
-6️⃣ Do not leave job early!
-7️⃣ Drivers must report all problems to ALEX immediately! → (732) 470-8667`;
-
-  // If job number is MCRC, swap in MCRC rules text for drivers.
-  if (jobNumber.toUpperCase() === 'MCRC') {
-    placeholdersBlock = placeholdersBlock.replace(
-      /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
-      `*5 LOADS MINIMUM* ⚠️ 
-
-🛑Monmouth County Reclamation Center gate closes at 03:30 PM!
-
-⚠️Save all Pure Soil & Monmouth County Reclamation Center tickets and give to CCG. Tickets are required for payment!
-
-*NO TICKETS - NO PAYMENT*\n\n`
-    );
-  }
-
-  // If job number is CMPM, swap in CMPM rules text for drivers.
-  if (jobNumber.toUpperCase() === 'CMPM') {
-    placeholdersBlock = placeholdersBlock.replace(
-      /Check in\/out[\s\S]*?📱 FleetWatcher APP\n\n/,
-      `*2 ROUNDS MINIMUM* ⚠️ 
-
-⚠️Save all Pure Soil, Colony Materials, & Plumstead Materials tickets and give to CCG. Tickets are required for payment!
-
-*NO TICKETS - NO PAYMENT*\n\n`
-    );
-  }
-
-  // Find the live Google Doc for this truck and stop if the truck number is unknown.
-  const docId = truckDocIds[truckNumber];
-  if (!docId) {
-    console.log(`Unknown truck number: ${truckNumber}`);
-    return;
-  }
-
-  // ===== STEP 1: Update the truck's live dispatch document =====
-  const truckDoc = DocumentApp.openById(docId);
-  const truckBody = truckDoc.getBody();
-  truckBody.setText(placeholdersBlock); // Put the full template text into the live doc before filling placeholders.
-  
-  // If this is an MCRC job, make the key warning lines bold and underlined.
-  if (jobNumber.toUpperCase() === 'MCRC') {
-    const bodyText = truckBody.editAsText();
-    const phrasesToStyle = ["5 LOADS MINIMUM", "NO TICKETS - NO PAYMENT"];
-    phrasesToStyle.forEach(phrase => {
-      const idx = bodyText.getText().indexOf(phrase);
-      if (idx !== -1) {
-        bodyText.setBold(idx, idx + phrase.length, true);
-        bodyText.setUnderline(idx, idx + phrase.length, true);
-      }
-    });
-  }
-
-  // If this is a CMPM job, make the key warning lines bold and underlined.
-  if (jobNumber.toUpperCase() === 'CMPM') {
-    const bodyText = truckBody.editAsText();
-    const phrasesToStyle = ["2 ROUNDS MINIMUM", "NO TICKETS - NO PAYMENT"];
-    phrasesToStyle.forEach(phrase => {
-      const idx = bodyText.getText().indexOf(phrase);
-      if (idx !== -1) {
-        bodyText.setBold(idx, idx + phrase.length, true);
-        bodyText.setUnderline(idx, idx + phrase.length, true);
-      }
-    });
-  }
-
-  // Fill all required placeholders (date, company, job number, times, etc.).
-  truckBody.replaceText("{{DATE}}", date);
-  truckBody.replaceText("{{SHIFT TIME}}", shiftTime + " ");
-  truckBody.replaceText("{{COMPANY}}", company);
-  truckBody.replaceText("{{JOB NUMBER}}", jobNumber);
-  truckBody.replaceText("{{START TIME}}", startTime);
-  truckBody.replaceText("{{START LOCATION}}", startLocation);
-  truckBody.replaceText("{{INSTRUCTIONS}}", instructions);
-  truckBody.replaceText("{{NOTES}}", notes);
-  truckBody.replaceText("{{TRUCK NUMBER}}", truckNumber);
-  truckBody.replaceText("{{TOLLS}}", tolls);
-
-  // For ADD 01: if user typed text, insert it; if blank, remove that line.
-  if (add01.trim()) {
-    truckBody.replaceText("{{ADD 01}}", add01.trim());
-  } else {
-    const paragraph = findParagraphContaining(truckBody, "{{ADD 01}}");
-    if (paragraph) paragraph.removeFromParent();
-  }
-
-  // For ADD 02: if user typed text, insert it and add spacing; if blank, remove that line.
-  if (add02.trim()) {
-    const para = findParagraphContaining(truckBody, "{{ADD 02}}");
-    if (para) {
-      const index = truckBody.getChildIndex(para);
-      truckBody.insertParagraph(index, ""); // Add an empty line above ADD 02 so the document stays easy to read.
-    }
-    truckBody.replaceText("{{ADD 02}}", add02.trim());
-  } else {
-    const paragraph = findParagraphContaining(truckBody, "{{ADD 02}}");
-    if (paragraph) paragraph.removeFromParent();
-  }
-
-  // For second assignment fields: show and format them only when the form includes values.
-  if (startTime02Raw.trim()) {
-    const label = "▪️Start Time 02:";
-    const formatted = `${label} ${startTime02}`;
-    truckBody.replaceText("{{START TIME 02:}}", formatted);
-    boldLabel(truckBody, label);
-  } else {
-    const paragraph = findParagraphContaining(truckBody, "{{START TIME 02:}}");
-    if (paragraph) paragraph.removeFromParent();
-  }
-
-  if (startLocation02.trim()) {
-    const label = "▪️Start Location 02:";
-    const formatted = `${label}\n${startLocation02}`;
-    truckBody.replaceText("{{START LOCATION 02:}}", formatted);
-    boldLabel(truckBody, label);
-  } else {
-    const paragraph = findParagraphContaining(truckBody, "{{START LOCATION 02:}}");
-    if (paragraph) paragraph.removeFromParent();
-  }
-
-  if (instructions02.trim()) {
-    const label = "▪️Instructions 02:";
-    const formatted = `${label}\n${instructions02}`;
-    truckBody.replaceText("{{INSTRUCTIONS 02:}}", formatted);
-    boldLabel(truckBody, label);
-  } else {
-    const paragraph = findParagraphContaining(truckBody, "{{INSTRUCTIONS 02:}}");
-    if (paragraph) paragraph.removeFromParent();
-  }
-
-  // Bold key labels again after text replacement (CONFIRM DISPATCH, Start Time, etc.).
-  boldLabel(truckBody, "CONFIRM DISPATCH");
-  boldLabel(truckBody, "Start Time");
-  boldLabel(truckBody, "Start Location");
-  boldLabel(truckBody, "Instructions");
-  boldLabel(truckBody, "Start Time 02:");
-  boldLabel(truckBody, "Start Location 02:");
-  boldLabel(truckBody, "Instructions 02:");
-
-  truckDoc.saveAndClose();
-
-  // ===== STEP 2: Create and fill an archive copy =====
+  // ===== Create and fill an archive copy =====
   try {
     const template = DriveApp.getFileById(templateId); // Load the template file from Drive.
     const folderId = truckArchiveFolders[truckNumber] || archiveFolderId; // Save to this truck's folder when mapped, otherwise use the fallback folder.
     const archiveFolder = DriveApp.getFolderById(folderId); // Open the destination Drive folder.
 
-    // Build date text used in archive file naming so files stay in date order.
-    const sortableDate = Utilities.formatDate(new Date(date), Session.getScriptTimeZone(), "yyyy-MM-dd");
 
     // Use the same HHMM start time in the archive file name.
     const newName = `${formattedDate}_${sortableStartTime}_Dispatch_${truckNumber}_${jobNumber}`; // File name pattern: YYYY-MM-DD_HHMM_Dispatch_TRUCK_JOB.

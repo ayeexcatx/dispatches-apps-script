@@ -19,7 +19,7 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 ### What it modifies
 - Reads the submitted form row from `e.values`.
 - Splits selected truck numbers and runs processing once per truck.
-- Triggers downstream work for each truck (live doc update, archive copy creation, company page refresh).
+- Triggers downstream work for each truck (archive copy creation, company page refresh).
 
 ### What **not** to change unless necessary
 - The **index positions** in `e.values` (these must match the exact Google Form question order).
@@ -33,34 +33,11 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 
 ---
 
-## 2) Live dispatch document updates
-
-### Exact function responsible
-- `onFormSubmit(e)` in `dispatch.js` (live-doc section inside it)
-- Helper: `boldLabel(body, labelText)`
-
-### What it modifies
-- Opens each truck’s live Google Doc (`DocumentApp.openById(docId)`).
-- Replaces placeholders like `{{DATE}}`, `{{START TIME}}`, `{{TRUCK NUMBER}}`.
-- Removes optional placeholder lines when fields are blank (via paragraph removal).
-- Applies bold/underline emphasis for selected labels and special job warnings.
-
-### What **not** to change unless necessary
-- Placeholder token names (for example `{{START LOCATION}}`) unless all template text and replacements are updated together.
-- Truck-to-doc ID mapping object (`truckDocIds`) structure.
-- Special-job text replacement behavior (`MCRC`, `CMPM`) unless rules actually changed.
-
-### Where formatting decisions are made
-- Base message layout and label wording are in `placeholdersBlock`.
-- Label styling is in `boldLabel(...)` plus targeted underline logic for special phrases.
-- Optional section display logic is in the `if (field.trim()) ... else remove paragraph` blocks.
-
----
-
-## 3) Archive dispatch creation
+## 2) Archive dispatch creation
 
 ### Exact function responsible
 - `onFormSubmit(e)` in `dispatch.js` (archive-copy section inside it)
+- Helper: `boldLabel(body, labelText)`
 
 ### What it modifies
 - Copies the archive template doc (`template.makeCopy(...)`).
@@ -71,16 +48,15 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 ### What **not** to change unless necessary
 - Archive file naming pattern (`YYYY-MM-DD_HHMM_Dispatch_TRUCK_JOB`) because page parsing/sorting depends on it.
 - Truck archive folder mappings (`truckArchiveFolders`) and fallback folder usage.
-- The same placeholder vocabulary used in live docs.
+- Placeholder token names (for example `{{START LOCATION}}`) unless template and replacement code are updated together.
 
 ### Where formatting decisions are made
 - Archive file name composition is inside `onFormSubmit`.
 - Archive text replacement for `MCRC` / `CMPM` is in archive-specific regex replacement blocks.
 - Archive label styling is applied with `boldLabel(...)` and phrase styling (`setBold`, `setUnderline`).
+- Optional section display logic is in the `if (field.trim()) ... else remove paragraph` blocks.
 
----
-
-## 4) Company web page rebuilding
+## 3) Company web page rebuilding
 
 ### Exact function responsible
 - `updateCompanyDispatchPage(companyName)` in `dispatch.js`
@@ -104,7 +80,7 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 
 ---
 
-## 5) Web app serving (read-only delivery path)
+## 4) Web app serving (read-only delivery path)
 
 ### Exact function responsible
 - `doGet(e)` in `webApp.js`
@@ -124,7 +100,7 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 
 ---
 
-## 6) Maintenance cleanup (safety for storage growth)
+## 5) Maintenance cleanup (safety for storage growth)
 
 ### Exact function responsible
 - `cleanupOldDispatches()` in `maintenance.js`
@@ -147,13 +123,13 @@ This project is a Google Apps Script dispatch pipeline. If you are changing beha
 
 - If adding a form field:
   - Update `e.values` index mapping in `onFormSubmit(e)`.
-  - Add placeholder replacement in both live and archive sections.
+  - Add placeholder replacement in the archive section.
   - Add optional removal logic if field can be blank.
 - If changing label text:
-  - Update text in template block and any related `boldLabel(...)` calls.
+  - Update text in the template doc and any related `boldLabel(...)` calls.
 - If changing file naming:
   - Update both creation and parsing logic in page rebuild functions.
 - If adding a truck/company:
-  - Update truck doc IDs, archive folder IDs, truck-to-company mapping, and company folder map.
+  - Update archive folder IDs, truck-to-company mapping, and company folder map.
 
 When unsure, prefer **minimal edits in one feature block** and keep naming/format conventions stable.

@@ -919,3 +919,7 @@ function updateAllCompanyPages() {
     updateCompanyDispatchPage(company);
   }
 }
+
+function testClaspConnection() {
+  Logger.log("Clasp connection working");
+}

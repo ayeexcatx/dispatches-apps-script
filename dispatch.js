@@ -28,6 +28,28 @@ function boldLabel(body, labelText) {
 }
 
 /**
+ * Apply bold + underline to an inserted title paragraph without changing any surrounding formatting.
+ *
+ * @param {GoogleAppsScript.Document.Body} body - The document text area to search through.
+ * @param {number} assignmentNumber - Assignment number to format, like 1 or 2.
+ */
+function formatInsertedTitleParagraph(body, assignmentNumber) {
+  const titlePattern = new RegExp(`ASSIGNMENT\\s+${assignmentNumber}`, 'i');
+  const paragraphs = body.getParagraphs();
+  for (let i = 0; i < paragraphs.length; i++) {
+    const textElement = paragraphs[i].editAsText();
+    const text = textElement.getText();
+    const match = text.match(titlePattern);
+    if (match) {
+      const index = match.index;
+      const endIndex = index + match[0].length - 1;
+      textElement.setBold(index, endIndex, true);
+      textElement.setUnderline(index, endIndex, true);
+    }
+  }
+}
+
+/**
  * This runs automatically each time someone submits the dispatch form.
  *
  * If more than one truck was selected, this repeats the same process for each truck:
@@ -237,6 +259,8 @@ truckNumbers.forEach(truckNumber => { // Run the full archive flow for each sele
     boldLabel(archiveBody, "Start Time 02:");
     boldLabel(archiveBody, "Start Location 02:");
     boldLabel(archiveBody, "Instructions 02:");
+    formatInsertedTitleParagraph(archiveBody, 1);
+    formatInsertedTitleParagraph(archiveBody, 2);
 
     archiveDoc.saveAndClose(); // Save all archive changes to Drive.
     console.log(`Archive copy created successfully: ${newName}`);
